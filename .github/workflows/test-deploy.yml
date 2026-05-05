@@ -3,7 +3,7 @@ name: Build and Deploy Ecommerce App
 on:
   push:
     branches:
-      - main   # change if needed
+      - test   # change if needed
 
 jobs:
   build:
