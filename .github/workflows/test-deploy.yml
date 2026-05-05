@@ -37,9 +37,10 @@ jobs:
         npm install
 
     - name: Build Frontend
+      working-directory: 03-frontend/angular-ecommerce
       run: |
-        cd 03-frontend/angular-ecommerce
-        npm run build --configuration production
+        npm install
+        npx ng build --configuration production
 
     # ---------------- DEPLOY ----------------
     - name: Copy files to VM
