@@ -11,15 +11,11 @@ jobs:
 
     steps:
 
-    # =====================================================
-    # STEP 1 — CHECKOUT CODE
-    # =====================================================
+    # ===================== CHECKOUT =====================
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # =====================================================
-    # STEP 2 — BACKEND BUILD (MAVEN)
-    # =====================================================
+    # ===================== BACKEND BUILD =====================
     - name: Set up Java
       uses: actions/setup-java@v3
       with:
@@ -30,88 +26,81 @@ jobs:
       working-directory: 02-backend/spring-boot-rest-api
       run: mvn clean package -DskipTests
 
-    # =====================================================
-    # STEP 3 — FRONTEND BUILD (ANGULAR)
-    # =====================================================
+    # ===================== FRONTEND BUILD =====================
     - name: Set up Node
       uses: actions/setup-node@v3
       with:
         node-version: '18'
 
-    - name: Install Frontend Dependencies
+    - name: Install dependencies
       working-directory: 03-frontend/angular-ecommerce
       run: npm install
 
-    - name: Build Frontend
+    - name: Build Angular (FIXED)
       working-directory: 03-frontend/angular-ecommerce
       run: npx ng build --configuration production
 
-    # =====================================================
-    # STEP 4 — VERIFY BUILD OUTPUT (VERY IMPORTANT)
-    # =====================================================
-    - name: Verify Build Output
+    # ===================== VERIFY OUTPUT (CRITICAL) =====================
+    - name: Verify build output
       run: |
-        echo "===== BACKEND JAR ====="
-        find 02-backend -type f -name "*.jar"
+        echo "===== BACKEND TARGET ====="
+        ls -R 02-backend/spring-boot-rest-api/target || true
 
         echo "===== FRONTEND DIST ====="
-        find 03-frontend/angular-ecommerce/dist || true
+        ls -R 03-frontend/angular-ecommerce/dist || true
 
-    # =====================================================
-    # STEP 5 — FAIL FAST IF OUTPUT MISSING (BEST PRACTICE)
-    # =====================================================
-    - name: Validate artifacts
+        echo "===== CHECK JAR ====="
+        find 02-backend -name "*.jar" || true
+
+        echo "===== CHECK ANGULAR DIST ====="
+        find 03-frontend -name "index.html" || true
+
+    # ===================== PREPARE ARTIFACTS (FIX FOR SCP) =====================
+    - name: Prepare deployment folder
       run: |
-        test -n "$(find 02-backend -name '*.jar')" || (echo "❌ Backend JAR not found" && exit 1)
-        test -d 03-frontend/angular-ecommerce/dist || (echo "❌ Frontend dist not found" && exit 1)
+        mkdir -p deploy/backend
+        mkdir -p deploy/frontend
 
-    # =====================================================
-    # STEP 6 — COPY FILES TO VM (FIXED SCP)
-    # =====================================================
+        # COPY JAR (IMPORTANT FIX)
+        cp $(find 02-backend -name "*.jar" | head -n 1) deploy/backend/app.jar
+
+        # COPY ANGULAR DIST (FIX ANGULAR OUTPUT PATH)
+        cp -r 03-frontend/angular-ecommerce/dist/* deploy/frontend/
+
+        echo "===== DEPLOY FOLDER CONTENT ====="
+        ls -R deploy
+
+    # ===================== COPY TO VM =====================
     - name: Copy files to VM
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
+        source: "deploy/*"
+        target: "/home/azureuser/test-deploy"
 
-        source: |
-          02-backend/spring-boot-rest-api/target/*.jar
-          03-frontend/angular-ecommerce/dist/**
-
-        target: /home/azureuser/test-deploy/
-
-    # =====================================================
-    # STEP 7 — DEPLOY ON VM
-    # =====================================================
+    # ===================== DEPLOY ON VM =====================
     - name: Deploy on VM
       uses: appleboy/ssh-action@v0.1.6
       with:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
-
         script: |
 
-          echo "=============================="
-          echo "STOPPING OLD BACKEND"
-          echo "=============================="
-          pkill -f spring-boot-rest-api || true
+          echo "Stopping old backend..."
+          pkill -f app.jar || true
 
-          echo "=============================="
-          echo "STARTING BACKEND (PORT 8081)"
-          echo "=============================="
-          nohup java -jar /home/azureuser/test-deploy/02-backend/spring-boot-rest-api/target/*.jar \
+          echo "Starting backend on 8081..."
+          nohup java -jar /home/azureuser/test-deploy/deploy/backend/app.jar \
           --server.port=8081 > backend.log 2>&1 &
 
-          echo "=============================="
-          echo "DEPLOYING FRONTEND TO NGINX"
-          echo "=============================="
-          sudo mkdir -p /var/www/test
+          echo "Deploying frontend to nginx..."
           sudo rm -rf /var/www/test/*
+          sudo cp -r /home/azureuser/test-deploy/deploy/frontend/* /var/www/test/
 
-          sudo cp -r /home/azureuser/test-deploy/03-frontend/angular-ecommerce/dist/** /var/www/test/
+          echo "Restarting nginx..."
+          sudo systemctl restart nginx
 
-          echo "=============================="
-          echo "DEPLOYMENT COMPLETED SUCCESSFULLY"
-          echo "=============================="
+          echo "DONE ✅ Deployment successful"
