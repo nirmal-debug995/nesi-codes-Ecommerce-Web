@@ -22,7 +22,7 @@ jobs:
 
     - name: Build Backend
       run: |
-        cd "02-backend/spring-boot rest api"
+        cd "02-backend/spring-boot-rest-api"
         mvn clean package
 
     # ---------------- FRONTEND ----------------
