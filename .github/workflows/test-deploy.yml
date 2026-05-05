@@ -56,6 +56,8 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_KEY }}
+            script: |
+              echo "SSH works"
           source: "deploy/*"
           target: "/home/${{ secrets.VM_USER }}/test-deploy"
 
