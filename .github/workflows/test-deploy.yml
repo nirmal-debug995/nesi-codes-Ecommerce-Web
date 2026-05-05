@@ -11,11 +11,11 @@ jobs:
 
     steps:
 
-    # ===================== CHECKOUT =====================
+    # ---------------- CHECKOUT ----------------
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # ===================== BACKEND BUILD =====================
+    # ---------------- BACKEND ----------------
     - name: Set up Java
       uses: actions/setup-java@v3
       with:
@@ -26,21 +26,23 @@ jobs:
       working-directory: 02-backend/spring-boot-rest-api
       run: mvn clean package -DskipTests
 
-    # ===================== FRONTEND BUILD =====================
+    # ---------------- FRONTEND ----------------
     - name: Set up Node
       uses: actions/setup-node@v3
       with:
         node-version: '18'
 
-    - name: Install dependencies
+    - name: Install Frontend Dependencies
       working-directory: 03-frontend/angular-ecommerce
       run: npm install
 
-    - name: Build Angular (FIXED)
+    - name: Build Frontend
       working-directory: 03-frontend/angular-ecommerce
       run: npx ng build --configuration production
 
-    # ===================== VERIFY OUTPUT (CRITICAL) =====================
+    # =====================================================
+    # STEP 1 — VERIFY OUTPUT BEFORE SCP
+    # =====================================================
     - name: Verify build output
       run: |
         echo "===== BACKEND TARGET ====="
@@ -49,28 +51,26 @@ jobs:
         echo "===== FRONTEND DIST ====="
         ls -R 03-frontend/angular-ecommerce/dist || true
 
-        echo "===== CHECK JAR ====="
-        find 02-backend -name "*.jar" || true
-
-        echo "===== CHECK ANGULAR DIST ====="
-        find 03-frontend -name "index.html" || true
-
-    # ===================== PREPARE ARTIFACTS (FIX FOR SCP) =====================
-    - name: Prepare deployment folder
+    # =====================================================
+    # STEP 2 — PREPARE CLEAN DEPLOY FOLDERS
+    # =====================================================
+    - name: Prepare deployment package
       run: |
         mkdir -p deploy/backend
         mkdir -p deploy/frontend
 
-        # COPY JAR (IMPORTANT FIX)
-        cp $(find 02-backend -name "*.jar" | head -n 1) deploy/backend/app.jar
+        # Copy backend jar (IMPORTANT FIX)
+        cp 02-backend/spring-boot-rest-api/target/*.jar deploy/backend/app.jar
 
-        # COPY ANGULAR DIST (FIX ANGULAR OUTPUT PATH)
+        # Copy angular build output (FIX: wildcard correct)
         cp -r 03-frontend/angular-ecommerce/dist/* deploy/frontend/
 
-        echo "===== DEPLOY FOLDER CONTENT ====="
+        echo "Deployment package ready:"
         ls -R deploy
 
-    # ===================== COPY TO VM =====================
+    # =====================================================
+    # STEP 3 — SCP (FIXED - NO EMPTY ARCHIVE ISSUE)
+    # =====================================================
     - name: Copy files to VM
       uses: appleboy/scp-action@v0.1.4
       with:
@@ -80,7 +80,9 @@ jobs:
         source: "deploy/*"
         target: "/home/azureuser/test-deploy"
 
-    # ===================== DEPLOY ON VM =====================
+    # =====================================================
+    # STEP 4 — DEPLOY ON VM
+    # =====================================================
     - name: Deploy on VM
       uses: appleboy/ssh-action@v0.1.6
       with:
@@ -89,14 +91,15 @@ jobs:
         key: ${{ secrets.VM_SSH_KEY }}
         script: |
 
-          echo "Stopping old backend..."
+          echo "Stopping backend..."
           pkill -f app.jar || true
 
-          echo "Starting backend on 8081..."
+          echo "Starting backend..."
           nohup java -jar /home/azureuser/test-deploy/deploy/backend/app.jar \
           --server.port=8081 > backend.log 2>&1 &
 
-          echo "Deploying frontend to nginx..."
+          echo "Deploying frontend..."
+          sudo mkdir -p /var/www/test
           sudo rm -rf /var/www/test/*
           sudo cp -r /home/azureuser/test-deploy/deploy/frontend/* /var/www/test/
 
