@@ -12,13 +12,13 @@ jobs:
     steps:
 
     # =====================================================
-    # STEP 0 — CHECKOUT
+    # STEP 1 — CHECKOUT CODE
     # =====================================================
     - name: Checkout code
       uses: actions/checkout@v3
 
     # =====================================================
-    # BACKEND BUILD
+    # STEP 2 — BACKEND BUILD (MAVEN)
     # =====================================================
     - name: Set up Java
       uses: actions/setup-java@v3
@@ -31,7 +31,7 @@ jobs:
       run: mvn clean package -DskipTests
 
     # =====================================================
-    # FRONTEND BUILD
+    # STEP 3 — FRONTEND BUILD (ANGULAR)
     # =====================================================
     - name: Set up Node
       uses: actions/setup-node@v3
@@ -47,18 +47,26 @@ jobs:
       run: npx ng build --configuration production
 
     # =====================================================
-    # STEP 1 — VERIFY OUTPUT (IMPORTANT FOR DEBUGGING)
+    # STEP 4 — VERIFY BUILD OUTPUT (VERY IMPORTANT)
     # =====================================================
     - name: Verify Build Output
       run: |
-        echo "===== BACKEND TARGET ====="
-        ls -R 02-backend/spring-boot-rest-api/target || true
+        echo "===== BACKEND JAR ====="
+        find 02-backend -type f -name "*.jar"
 
         echo "===== FRONTEND DIST ====="
-        ls -R 03-frontend/angular-ecommerce/dist || true
+        find 03-frontend/angular-ecommerce/dist || true
 
     # =====================================================
-    # STEP 2 — FIX SCP (NO WILDCARDS, CLEAN PATHS)
+    # STEP 5 — FAIL FAST IF OUTPUT MISSING (BEST PRACTICE)
+    # =====================================================
+    - name: Validate artifacts
+      run: |
+        test -n "$(find 02-backend -name '*.jar')" || (echo "❌ Backend JAR not found" && exit 1)
+        test -d 03-frontend/angular-ecommerce/dist || (echo "❌ Frontend dist not found" && exit 1)
+
+    # =====================================================
+    # STEP 6 — COPY FILES TO VM (FIXED SCP)
     # =====================================================
     - name: Copy files to VM
       uses: appleboy/scp-action@v0.1.4
@@ -66,13 +74,15 @@ jobs:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
+
         source: |
           02-backend/spring-boot-rest-api/target/*.jar
-          03-frontend/angular-ecommerce/dist/angular-ecommerce/*
+          03-frontend/angular-ecommerce/dist/**
+
         target: /home/azureuser/test-deploy/
 
     # =====================================================
-    # STEP 3 — DEPLOY ON VM
+    # STEP 7 — DEPLOY ON VM
     # =====================================================
     - name: Deploy on VM
       uses: appleboy/ssh-action@v0.1.6
@@ -80,19 +90,28 @@ jobs:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
+
         script: |
 
-          echo "Stopping old backend..."
+          echo "=============================="
+          echo "STOPPING OLD BACKEND"
+          echo "=============================="
           pkill -f spring-boot-rest-api || true
 
-          echo "Starting backend..."
+          echo "=============================="
+          echo "STARTING BACKEND (PORT 8081)"
+          echo "=============================="
           nohup java -jar /home/azureuser/test-deploy/02-backend/spring-boot-rest-api/target/*.jar \
           --server.port=8081 > backend.log 2>&1 &
 
-          echo "Deploying frontend..."
+          echo "=============================="
+          echo "DEPLOYING FRONTEND TO NGINX"
+          echo "=============================="
           sudo mkdir -p /var/www/test
           sudo rm -rf /var/www/test/*
 
-          sudo cp -r /home/azureuser/test-deploy/03-frontend/angular-ecommerce/dist/angular-ecommerce/* /var/www/test/
+          sudo cp -r /home/azureuser/test-deploy/03-frontend/angular-ecommerce/dist/** /var/www/test/
 
-          echo "Deployment completed successfully"
+          echo "=============================="
+          echo "DEPLOYMENT COMPLETED SUCCESSFULLY"
+          echo "=============================="
