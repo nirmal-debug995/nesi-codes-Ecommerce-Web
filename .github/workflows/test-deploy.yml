@@ -32,11 +32,14 @@ jobs:
         run: |
           mkdir -p deploy/backend
           mkdir -p deploy/frontend
-
+          
+          echo "Building backend jar..."
           cp 02-backend/spring-boot-rest-api/target/*.jar deploy/backend/app.jar
 
-          cp -r 01-frontend/angular-ecommerce deploy/frontend/
+          echo "Copying frontend..."
+          cp -r frontend/angular-ecommerce deploy/frontend/
 
+          echo "Checking deploy folder..."
           ls -R deploy
 
       # 5. Copy files to VM (FIXED)
