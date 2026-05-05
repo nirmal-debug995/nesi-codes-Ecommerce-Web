@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
     # ---------------- CHECKOUT ----------------
     - name: Checkout code
       uses: actions/checkout@v3
@@ -39,7 +40,20 @@ jobs:
       working-directory: 03-frontend/angular-ecommerce
       run: npx ng build --configuration production
 
-    # ---------------- DEPLOY TO VM ----------------
+    # =====================================================
+    # STEP 1 — VERIFY OUTPUT BEFORE SCP (IMPORTANT DEBUG)
+    # =====================================================
+    - name: Verify build output
+      run: |
+        echo "===== BACKEND TARGET ====="
+        ls -R 02-backend/spring-boot-rest-api/target || true
+
+        echo "===== FRONTEND DIST ====="
+        ls -R 03-frontend/angular-ecommerce/dist || true
+
+    # =====================================================
+    # STEP 2 — FIX SCP (REMOVE WILDCARD ISSUE)
+    # =====================================================
     - name: Copy files to VM
       uses: appleboy/scp-action@v0.1.4
       with:
@@ -47,11 +61,11 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         source: |
-          02-backend/spring-boot-rest-api/target/*.jar
-          03-frontend/angular-ecommerce/dist/angular-ecommerce/*
+          02-backend/spring-boot-rest-api/target/
+          03-frontend/angular-ecommerce/dist/
         target: /home/azureuser/test-deploy/
 
-    # ---------------- RUN ON VM ----------------
+    # ---------------- DEPLOY ON VM ----------------
     - name: Deploy on VM
       uses: appleboy/ssh-action@v0.1.6
       with:
@@ -59,7 +73,8 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         script: |
-          echo "Stopping old backend..."
+
+          echo "Stopping existing backend..."
           pkill -f spring-boot || true
 
           echo "Starting backend..."
@@ -69,6 +84,7 @@ jobs:
           echo "Deploying frontend..."
           sudo mkdir -p /var/www/test
           sudo rm -rf /var/www/test/*
-          sudo cp -r /home/azureuser/test-deploy/03-frontend/angular-ecommerce/dist/angular-ecommerce/* /var/www/test/
 
-          echo "Deployment complete"
+          sudo cp -r /home/azureuser/test-deploy/03-frontend/angular-ecommerce/dist/* /var/www/test/
+
+          echo "Deployment completed successfully"
