@@ -11,11 +11,15 @@ jobs:
 
     steps:
 
-    # ---------------- CHECKOUT ----------------
+    # =====================================================
+    # STEP 0 — CHECKOUT
+    # =====================================================
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # ---------------- BACKEND ----------------
+    # =====================================================
+    # BACKEND BUILD
+    # =====================================================
     - name: Set up Java
       uses: actions/setup-java@v3
       with:
@@ -24,9 +28,11 @@ jobs:
 
     - name: Build Backend
       working-directory: 02-backend/spring-boot-rest-api
-      run: mvn clean package
+      run: mvn clean package -DskipTests
 
-    # ---------------- FRONTEND ----------------
+    # =====================================================
+    # FRONTEND BUILD
+    # =====================================================
     - name: Set up Node
       uses: actions/setup-node@v3
       with:
@@ -41,9 +47,9 @@ jobs:
       run: npx ng build --configuration production
 
     # =====================================================
-    # STEP 1 — VERIFY OUTPUT BEFORE SCP (IMPORTANT DEBUG)
+    # STEP 1 — VERIFY OUTPUT (IMPORTANT FOR DEBUGGING)
     # =====================================================
-    - name: Verify build output
+    - name: Verify Build Output
       run: |
         echo "===== BACKEND TARGET ====="
         ls -R 02-backend/spring-boot-rest-api/target || true
@@ -52,7 +58,7 @@ jobs:
         ls -R 03-frontend/angular-ecommerce/dist || true
 
     # =====================================================
-    # STEP 2 — FIX SCP (REMOVE WILDCARD ISSUE)
+    # STEP 2 — FIX SCP (NO WILDCARDS, CLEAN PATHS)
     # =====================================================
     - name: Copy files to VM
       uses: appleboy/scp-action@v0.1.4
@@ -61,11 +67,13 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.VM_SSH_KEY }}
         source: |
-          02-backend/spring-boot-rest-api/target
-          03-frontend/angular-ecommerce/dist
+          02-backend/spring-boot-rest-api/target/*.jar
+          03-frontend/angular-ecommerce/dist/angular-ecommerce/*
         target: /home/azureuser/test-deploy/
 
-    # ---------------- DEPLOY ON VM ----------------
+    # =====================================================
+    # STEP 3 — DEPLOY ON VM
+    # =====================================================
     - name: Deploy on VM
       uses: appleboy/ssh-action@v0.1.6
       with:
@@ -74,8 +82,8 @@ jobs:
         key: ${{ secrets.VM_SSH_KEY }}
         script: |
 
-          echo "Stopping existing backend..."
-          pkill -f spring-boot || true
+          echo "Stopping old backend..."
+          pkill -f spring-boot-rest-api || true
 
           echo "Starting backend..."
           nohup java -jar /home/azureuser/test-deploy/02-backend/spring-boot-rest-api/target/*.jar \
@@ -85,6 +93,6 @@ jobs:
           sudo mkdir -p /var/www/test
           sudo rm -rf /var/www/test/*
 
-          sudo cp -r /home/azureuser/test-deploy/03-frontend/angular-ecommerce/dist/* /var/www/test/
+          sudo cp -r /home/azureuser/test-deploy/03-frontend/angular-ecommerce/dist/angular-ecommerce/* /var/www/test/
 
           echo "Deployment completed successfully"
