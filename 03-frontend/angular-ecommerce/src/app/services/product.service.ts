@@ -1,72 +1,99 @@
 import { Injectable } from '@angular/core';
-import {HttpClient} from "@angular/common/http";
-import {Product} from "../common/product";
-import {map, Observable} from "rxjs";
-import {ProductCategory} from "../common/product-category";
+import { HttpClient } from "@angular/common/http";
+import { Product } from "../common/product";
+import { map, Observable } from "rxjs";
+import { ProductCategory } from "../common/product-category";
+import { environment } from "../../environments/environment";
 
 @Injectable({
   providedIn: 'root'
 })
 export class ProductService {
 
-  private baseUrl = "http://localhost:8080/api/products";
+  // ✅ Use environment-based API URL (PRODUCTION READY)
+  private baseUrl = `${environment.apiUrl}/products`;
+  private categoryUrl = `${environment.apiUrl}/product-category`;
 
-  private categoryUrl = "http://localhost:8080/api/product-category";
-
-  //injecting httpClient
   constructor(private httpClient: HttpClient) { }
 
-  //new method to map the json data from Spring Data Rest to a Product array
-  getProductList(theCategoryId: number): Observable<Product[]>{
+  // Get products by category
+  getProductList(theCategoryId: number): Observable<Product[]> {
 
-    const searchUrl = `${this.baseUrl}/search/findByCategoryId?id=${theCategoryId}`;
+    const searchUrl =
+      `${this.baseUrl}/search/findByCategoryId?id=${theCategoryId}`;
 
     return this.getProducts(searchUrl);
   }
 
-  getProductListPaginate(thePage: number, thePageSize: number, theCategoryId: number): Observable<GetResponseProducts>{
+  // Pagination support
+  getProductListPaginate(
+    thePage: number,
+    thePageSize: number,
+    theCategoryId: number
+  ): Observable<any> {
 
-    const searchUrl = `${this.baseUrl}/search/findByCategoryId?id=${theCategoryId}&page=${thePage}&size=${thePageSize}`;
+    const searchUrl =
+      `${this.baseUrl}/search/findByCategoryId?id=${theCategoryId}` +
+      `&page=${thePage}&size=${thePageSize}`;
 
     return this.httpClient.get<GetResponseProducts>(searchUrl);
   }
 
+  // Get categories
   getProductCategories(): Observable<ProductCategory[]> {
 
-    return this.httpClient.get<GetResponseProductCategory>(this.categoryUrl).pipe(
-      map(response => response._embedded.productCategory)
-    );
+    return this.httpClient.get<GetResponseProductCategory>(this.categoryUrl)
+      .pipe(
+        map(response => response._embedded.productCategory)
+      );
   }
 
+  // Search products
   searchProducts(theKeyword: string): Observable<Product[]> {
-    const searchUrl = `${this.baseUrl}/search/findByNameContaining?name=${theKeyword}`;
+
+    const searchUrl =
+      `${this.baseUrl}/search/findByNameContaining?name=${theKeyword}`;
 
     return this.getProducts(searchUrl);
   }
 
-  searchProductsPaginate(thePage: number, thePageSize: number, theKeyword: string): Observable<GetResponseProducts>{
+  // Search with pagination
+  searchProductsPaginate(
+    thePage: number,
+    thePageSize: number,
+    theKeyword: string
+  ): Observable<any> {
 
-    const searchUrl = `${this.baseUrl}/search/findByNameContaining?name=${theKeyword}&page=${thePage}&size=${thePageSize}`;
+    const searchUrl =
+      `${this.baseUrl}/search/findByNameContaining?name=${theKeyword}` +
+      `&page=${thePage}&size=${thePageSize}`;
 
     return this.httpClient.get<GetResponseProducts>(searchUrl);
   }
 
+  // Core reusable method
   private getProducts(searchUrl: string): Observable<Product[]> {
-    return this.httpClient.get<GetResponseProducts>(searchUrl).pipe(map(response => response._embedded.products));
+
+    return this.httpClient.get<GetResponseProducts>(searchUrl)
+      .pipe(
+        map(response => response._embedded.products)
+      );
   }
 
-  getProduct(theProductId: number): Observable<Product>{
+  // Get single product
+  getProduct(theProductId: number): Observable<Product> {
+
     const productUrl = `${this.baseUrl}/${theProductId}`;
 
-    //no .pipe and using the interfaces to unwrap from _embedded entry bcs the json returned from spring dosent have it in this case
     return this.httpClient.get<Product>(productUrl);
   }
 }
 
-//unwraps the json from the Spring Data Rest _embedded entry
-interface GetResponseProducts{
-  _embedded:{
-    products:Product[];
+// ================= RESPONSE INTERFACES =================
+
+interface GetResponseProducts {
+  _embedded: {
+    products: Product[];
   },
   page: {
     size: number,
@@ -76,8 +103,8 @@ interface GetResponseProducts{
   }
 }
 
-interface GetResponseProductCategory{
-  _embedded:{
+interface GetResponseProductCategory {
+  _embedded: {
     productCategory: ProductCategory[]
   }
 }

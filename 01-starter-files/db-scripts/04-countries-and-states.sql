@@ -1,4 +1,4 @@
-USE `full-stack-ecommerce`;
+USE `ecommerce`;
 
 SET foreign_key_checks = 0;
 
@@ -39,8 +39,10 @@ CREATE TABLE `state` (
   `country_id` smallint unsigned NOT NULL,
   PRIMARY KEY (`id`),
   KEY `fk_country` (`country_id`),
-  CONSTRAINT `fk_country` FOREIGN KEY (`country_id`) REFERENCES `country` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1;
+  CONSTRAINT `fk_country`
+    FOREIGN KEY (`country_id`)
+    REFERENCES `country` (`id`)
+) ENGINE=InnoDB;
 
 --
 -- Dumping data for table `state`

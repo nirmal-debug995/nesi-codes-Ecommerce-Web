@@ -1,8 +1,8 @@
 -- -----------------------------------------------------
--- Schema full-stack-ecommerce
+-- Schema ecommerce
 -- -----------------------------------------------------
 
-USE `full-stack-ecommerce`;
+USE `ecommerce`;
 
 --
 -- Prep work
@@ -70,7 +70,7 @@ CREATE TABLE `order_item` (
   `quantity` int DEFAULT NULL,
   `unit_price` decimal(19,2) DEFAULT NULL,
   `order_id` bigint DEFAULT NULL,
-  `product_id` bigint DEFAULT NULL,
+  `product_id` BIGINT NOT NULL,
   PRIMARY KEY (`id`),
   KEY `K_order_id` (`order_id`),
   CONSTRAINT `FK_order_id` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`),
